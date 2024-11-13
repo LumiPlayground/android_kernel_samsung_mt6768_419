@@ -133,9 +133,6 @@ static enum IMGSENSOR_RETURN mclk_set(
 	enum   IMGSENSOR_RETURN ret = IMGSENSOR_RETURN_SUCCESS;
 	enum MCLK_STATE state_index = MCLK_STATE_DISABLE;
 
-	if (sensor_idx < 0)
-		return IMGSENSOR_RETURN_ERROR;
-
 	if (pin_state < IMGSENSOR_HW_PIN_STATE_LEVEL_0 ||
 	    pin_state > IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH) {
 		ret = IMGSENSOR_RETURN_ERROR;
@@ -161,7 +158,7 @@ static enum IMGSENSOR_RETURN mclk_set(
 
 		mutex_lock(pinst->pmclk_mutex);
 
-		if (!IS_ERR(ppinctrl_state))
+		if (ppinctrl_state != NULL && !IS_ERR(ppinctrl_state))
 			pinctrl_select_state(pinst->ppinctrl, ppinctrl_state);
 		else
 			PK_PR_ERR(

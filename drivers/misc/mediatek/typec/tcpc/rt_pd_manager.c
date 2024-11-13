@@ -13,13 +13,22 @@
 #include "inc/tcpci_typec.h"
 #ifdef CONFIG_MTK_CHARGER
 #include <charger_class.h>
+#ifdef ADAPT_CHARGER_V1
+#include <mt-plat/v1/mtk_charger.h>
+#else
 #include <mtk_charger.h>
+#endif
 #endif /* CONFIG_MTK_CHARGER */
 #ifdef CONFIG_WATER_DETECTION
 #include <mt-plat/mtk_boot.h>
 #endif /* CONFIG_WATER_DETECTION */
 
 #define RT_PD_MANAGER_VERSION	"1.0.8_MTK"
+
+#ifdef CONFIG_OCP96011_I2C
+#include "../switch/ocp96011-i2c.h"
+extern void typec_headset_queue_work(void);
+#endif
 
 struct rt_pd_manager_data {
 	struct device *dev;
@@ -63,6 +72,8 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 	enum typec_pwr_opmode opmode = TYPEC_PWR_MODE_USB;
 	uint32_t partner_vdos[VDO_MAX_NR];
 #ifdef CONFIG_WATER_DETECTION
+	struct pd_port *pd_port = &rpmd->tcpc->pd_port;
+	struct pe_data *pe_data = &pd_port->pe_data;
 #ifdef CONFIG_MTK_CHARGER
 #ifndef ADAPT_CHARGER_V1
 	union power_supply_propval val = {.intval = 0};
@@ -104,7 +115,9 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 		    (new_state == TYPEC_ATTACHED_SNK ||
 		     new_state == TYPEC_ATTACHED_NORP_SRC ||
 		     new_state == TYPEC_ATTACHED_CUSTOM_SRC ||
-		     new_state == TYPEC_ATTACHED_DBGACC_SNK)) {
+		     new_state == TYPEC_ATTACHED_DBGACC_SNK ||
+		     new_state == TYPEC_ATTACHED_WD_SNK)) {
+
 			dev_info(rpmd->dev,
 				 "%s Charger plug in, polarity = %d\n",
 				 __func__, noti->typec_state.polarity);
@@ -113,16 +126,35 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 			 * and enable device connection
 			 */
 
+#ifndef CONFIG_WATER_DETECTION
 			typec_set_data_role(rpmd->typec_port, TYPEC_DEVICE);
 			typec_set_pwr_role(rpmd->typec_port, TYPEC_SINK);
 			typec_set_pwr_opmode(rpmd->typec_port,
 					     noti->typec_state.rp_level -
 					     TYPEC_CC_VOLT_SNK_DFT);
 			typec_set_vconn_role(rpmd->typec_port, TYPEC_SINK);
+#else
+			if (!pe_data->pe_ready) {
+				typec_set_data_role(rpmd->typec_port, TYPEC_DEVICE);
+				typec_set_pwr_role(rpmd->typec_port, TYPEC_SINK);
+				typec_set_pwr_opmode(rpmd->typec_port,
+						     noti->typec_state.rp_level -
+						     TYPEC_CC_VOLT_SNK_DFT);
+				typec_set_vconn_role(rpmd->typec_port, TYPEC_SINK);
+			} else {
+				if (pd_port->data_role != PD_ROLE_DFP)
+					typec_set_data_role(rpmd->typec_port, TYPEC_DEVICE);
+				if (pd_port->power_role != PD_ROLE_SOURCE)
+					typec_set_pwr_role(rpmd->typec_port, TYPEC_SINK);
+				if (pd_port->vconn_role != PD_ROLE_VCONN_ON)
+					typec_set_vconn_role(rpmd->typec_port, TYPEC_SINK);
+			}
+#endif /* CONFIG_WATER_DETECTION */
 		} else if ((old_state == TYPEC_ATTACHED_SNK ||
 			    old_state == TYPEC_ATTACHED_NORP_SRC ||
 			    old_state == TYPEC_ATTACHED_CUSTOM_SRC ||
-			    old_state == TYPEC_ATTACHED_DBGACC_SNK) &&
+			    old_state == TYPEC_ATTACHED_DBGACC_SNK ||
+			    old_state == TYPEC_ATTACHED_WD_SNK) &&
 			    new_state == TYPEC_UNATTACHED) {
 			dev_info(rpmd->dev, "%s Charger plug out\n", __func__);
 			/*
@@ -137,8 +169,6 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 				 __func__, noti->typec_state.polarity);
 			/* enable host connection */
 
-			typec_set_data_role(rpmd->typec_port, TYPEC_HOST);
-			typec_set_pwr_role(rpmd->typec_port, TYPEC_SOURCE);
 			switch (noti->typec_state.local_rp_level) {
 			case TYPEC_RP_3_0:
 				opmode = TYPEC_PWR_MODE_3_0A;
@@ -151,8 +181,26 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 				opmode = TYPEC_PWR_MODE_USB;
 				break;
 			}
+#ifndef CONFIG_WATER_DETECTION
+			typec_set_data_role(rpmd->typec_port, TYPEC_HOST);
+			typec_set_pwr_role(rpmd->typec_port, TYPEC_SOURCE);
 			typec_set_pwr_opmode(rpmd->typec_port, opmode);
 			typec_set_vconn_role(rpmd->typec_port, TYPEC_SOURCE);
+#else
+			if (!pe_data->pe_ready) {
+				typec_set_data_role(rpmd->typec_port, TYPEC_HOST);
+				typec_set_pwr_role(rpmd->typec_port, TYPEC_SOURCE);
+				typec_set_pwr_opmode(rpmd->typec_port, opmode);
+				typec_set_vconn_role(rpmd->typec_port, TYPEC_SOURCE);
+			} else {
+				if (pd_port->data_role != PD_ROLE_UFP)
+					typec_set_data_role(rpmd->typec_port, TYPEC_HOST);
+				if (pd_port->power_role != PD_ROLE_SINK)
+					typec_set_pwr_role(rpmd->typec_port, TYPEC_SOURCE);
+				if (pd_port->vconn_role != PD_ROLE_VCONN_OFF)
+					typec_set_vconn_role(rpmd->typec_port, TYPEC_SOURCE);
+			}
+#endif /* CONFIG_WATER_DETECTION */
 		} else if ((old_state == TYPEC_ATTACHED_SRC ||
 			    old_state == TYPEC_ATTACHED_DEBUG) &&
 			    new_state == TYPEC_UNATTACHED) {
@@ -162,10 +210,18 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 			   new_state == TYPEC_ATTACHED_AUDIO) {
 			dev_info(rpmd->dev, "%s Audio plug in\n", __func__);
 			/* enable AudioAccessory connection */
+#ifdef CONFIG_OCP96011_I2C
+			ocp96011_switch_event(0);
+			typec_headset_queue_work();
+#endif
 		} else if (old_state == TYPEC_ATTACHED_AUDIO &&
 			   new_state == TYPEC_UNATTACHED) {
 			dev_info(rpmd->dev, "%s Audio plug out\n", __func__);
 			/* disable AudioAccessory connection */
+#ifdef CONFIG_OCP96011_I2C
+			ocp96011_switch_event(1);
+			typec_headset_queue_work();
+#endif
 		}
 
 		if (new_state == TYPEC_UNATTACHED) {
@@ -296,10 +352,23 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 		case PD_CONNECT_PE_READY_SNK_APDO:
 		case PD_CONNECT_PE_READY_SRC:
 		case PD_CONNECT_PE_READY_SRC_PD30:
+			if (!rpmd->partner) {
+				memset(&rpmd->partner_identity, 0,
+					sizeof(rpmd->partner_identity));
+				rpmd->partner_desc.accessory =
+					TYPEC_ACCESSORY_NONE;
+				rpmd->partner = typec_register_partner(rpmd->typec_port,
+					&rpmd->partner_desc);
+				if (IS_ERR(rpmd->partner)) {
+					ret = PTR_ERR(rpmd->partner);
+					dev_notice(rpmd->dev,
+						   "%s typec register partner fail(%d)\n",
+						   __func__, ret);
+					break;
+				}
+			}
 			typec_set_pwr_opmode(rpmd->typec_port,
 					     TYPEC_PWR_MODE_PD);
-			if (!rpmd->partner)
-				break;
 			ret = tcpm_inquire_pd_partner_inform(rpmd->tcpc,
 							     partner_vdos);
 			if (ret != TCPM_SUCCESS)
@@ -667,7 +736,7 @@ err_get_tcpc_dev:
 #ifdef ADAPT_CHARGER_V1
 err_get_chg_consumer:
 #else
-#ifdef CONFIG_WATER_DETECTIO
+#ifdef CONFIG_WATER_DETECTION
 	power_supply_put(rpmd->chg_psy);
 err_get_chg_psy:
 #endif /* CONFIG_WATER_DETECTION */

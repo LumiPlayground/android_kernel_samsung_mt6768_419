@@ -2521,8 +2521,10 @@ page_owner=on loop.max_part=7";
 		clocks = <&topckgen_clk CLK_TOP_MSDC50_0_HCLK>,
 			 <&topckgen_clk CLK_TOP_MSDC50_0>,
 			 <&infracfg_ao_clk CLK_IFRAO_MSDC0>,
-			 <&infracfg_ao_clk CLK_IFRAO_MSDC0_SRC>;
-		clock-names = "bus_clk", "source", "hclk", "source_cg";
+			 <&infracfg_ao_clk CLK_IFRAO_MSDC0_SRC>,
+			 <&infracfg_ao_clk CLK_IFRAO_AES>;
+		clock-names = "bus_clk", "source", "hclk", "source_cg",
+			"crypto_clk";
 		status = "disabled";
 	};
 
@@ -6681,7 +6683,7 @@ page_owner=on loop.max_part=7";
 		reg = <0 0x11D01000 0 0x1000>,
 			<0 0x11000180 0 0x180>;
 		interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&imp_iic_wrap_s_clk CLK_IMPC_AP_I2C12_RO>,
+		clocks = <&imp_iic_wrap_s_clk CLK_IMPS_AP_I2C2_RO>,
 			<&infracfg_ao_clk CLK_IFRAO_AP_DMA_PS>;
 		clock-names = "main", "dma";
 		clock-div = <5>;
@@ -8709,11 +8711,6 @@ page_owner=on loop.max_part=7";
 #include "mediatek/mt6359p.dtsi"
 #include "mediatek/cust_mt6893_msdc.dtsi"
 #include "mediatek/v1/mt6360_pd.dtsi"
-
-&mt_pmic_vemc_ldo_reg {
-	regulator-min-microvolt = <3000000>;
-	regulator-max-microvolt = <3000000>;
-};
 
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"

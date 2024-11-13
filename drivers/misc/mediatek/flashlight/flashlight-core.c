@@ -68,6 +68,10 @@ static int pt_strict; /* always be zero in C standard */
 static int pt_is_low(int pt_low_vol, int pt_low_bat, int pt_over_cur);
 #endif
 
+#ifdef CONFIG_MTK_SM5714_FLASHLIGHT
+extern bool sm5714_is_fd_in_use(void);
+#endif
+
 /******************************************************************************
  * Weak functions
  *****************************************************************************/
@@ -897,14 +901,21 @@ static int flashlight_release(struct inode *inode, struct file *file)
 	struct flashlight_dev *fdev;
 
 	mutex_lock(&fl_mutex);
-	list_for_each_entry(fdev, &flashlight_list, node) {
-		if (!fdev->ops)
-			continue;
 
-		pr_debug("Release(%d,%d,%d)\n", fdev->dev_id.type,
-				fdev->dev_id.ct, fdev->dev_id.part);
-		fl_enable(fdev, 0);
-		fdev->ops->flashlight_release();
+#ifdef CONFIG_MTK_SM5714_FLASHLIGHT
+	if (!sm5714_is_fd_in_use())
+#endif
+	{
+		list_for_each_entry(fdev, &flashlight_list, node) {
+			if (!fdev->ops)
+				continue;
+
+			pr_debug("Release(%d,%d,%d)\n", fdev->dev_id.type,
+					fdev->dev_id.ct, fdev->dev_id.part);
+			if (fdev->enable != 0)
+				fl_enable(fdev, 0);
+			fdev->ops->flashlight_release();
+		}
 	}
 	mutex_unlock(&fl_mutex);
 
@@ -1587,7 +1598,8 @@ static int fl_uninit(void)
 		if (fdev->ops) {
 			fdev->ops->flashlight_open();
 			fdev->ops->flashlight_set_driver(1);
-			fl_enable(fdev, 0);
+			if (fdev->enable != 0)
+				fl_enable(fdev, 0);
 			fdev->ops->flashlight_set_driver(0);
 			fdev->ops->flashlight_release();
 		}

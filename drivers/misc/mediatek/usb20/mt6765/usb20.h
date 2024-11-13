@@ -123,3 +123,5 @@ extern void mt_usb_dev_disconnect(void);
 #define USB1_CDEN		BIT(0)
 #define USB1_CDDEBOUNCE(x)	(((x) & 0xf) << 1)
 #endif
+
+void set_usb_phy_mode(int mode);

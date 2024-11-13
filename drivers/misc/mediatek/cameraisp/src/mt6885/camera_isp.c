@@ -42,7 +42,7 @@
 #include <clk-mt6893-pg.h>
 #endif
 #ifdef CONFIG_MACH_MT6885
-#include <clk-mt6885-pg.h>
+#include <clk-mt6893-pg.h>
 #endif
 
 
@@ -52,7 +52,7 @@
 /* #define EP_STAGE */
 //#define EP_STAGE
 #ifdef EP_STAGE
-#define EP_MARK_SMI /* disable SMI related for EP */
+//#define EP_MARK_SMI /* disable SMI related for EP */
 //#define DUMMY_INT   /* For early if load dont need to use camera */
 
 /* Clkmgr is not ready in early porting, en/disable clock  by hardcode */
@@ -254,7 +254,6 @@ const struct ISR_TABLE IRQ_CB_TBL[ISP_IRQ_TYPE_AMOUNT] = {
  *  "ISP_DEV_NODE_ENUM" in camera_isp.h
  */
 
-#ifdef CONFIG_MACH_MT6893
 static const struct of_device_id isp_of_ids[] = {
 	{
 		.compatible = "mediatek,camsys",
@@ -311,65 +310,6 @@ static const struct of_device_id isp_of_ids[] = {
 		.compatible = "mediatek,camsv8",
 	},
 	{} };
-#endif
-#ifdef CONFIG_MACH_MT6885
-static const struct of_device_id isp_of_ids[] = {
-	{
-		.compatible = "mediatek,camsys",
-	},
-	{
-		.compatible = "mediatek,camsys_rawa",
-	},
-	{
-		.compatible = "mediatek,camsys_rawb",
-	},
-	{
-		.compatible = "mediatek,camsys_rawc",
-	},
-	{
-		.compatible = "mediatek,cam1_inner",
-	},
-	{
-		.compatible = "mediatek,cam2_inner",
-	},
-	{
-		.compatible = "mediatek,cam3_inner",
-	},
-	{
-		.compatible = "mediatek,cam1",
-	},
-	{
-		.compatible = "mediatek,cam2",
-	},
-	{
-		.compatible = "mediatek,cam3",
-	},
-	{
-		.compatible = "mediatek,camsv1",
-	},
-	{
-		.compatible = "mediatek,camsv2",
-	},
-	{
-		.compatible = "mediatek,camsv3",
-	},
-	{
-		.compatible = "mediatek,camsv4",
-	},
-	{
-		.compatible = "mediatek,camsv5",
-	},
-	{
-		.compatible = "mediatek,camsv6",
-	},
-	{
-		.compatible = "mediatek,camsv7",
-	},
-	{
-		.compatible = "mediatek,camsv8",
-	},
-	{} };
-#endif
 
 #endif
 /* ////////////////////////////////////////////////////////////////////////// */
@@ -647,7 +587,6 @@ struct ISP_IRQ_ERR_WAN_CNT_STRUCT {
 };
 
 static int FirstUnusedIrqUserKey = 1;
-#define USERKEY_STR_LEN 128
 
 struct UserKeyInfo {
 	/* name for the user that register a userKey */
@@ -1032,6 +971,7 @@ struct _isp_bk_reg_t {
 
 static struct _isp_bk_reg_t g_BkReg[ISP_IRQ_TYPE_AMOUNT];
 
+#ifndef EP_NO_CLKMGR
 static void cam_subsys_after_on(enum subsys_id sys_id)
 {
 /*
@@ -1095,7 +1035,7 @@ static void cam_subsys_debug_dump(enum subsys_id sys_id)
 			sys_id);
 	}
 }
-#ifndef EP_NO_CLKMGR
+
 static struct pg_callbacks cam_clk_subsys_handle = {
 	.after_on = cam_subsys_after_on,
 	.before_off = cam_subsys_before_off,

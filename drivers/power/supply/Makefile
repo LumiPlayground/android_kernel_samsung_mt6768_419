@@ -8,9 +8,17 @@ else ifeq ($(CONFIG_MACH_MT6771),y)
 obj-y += mediatek/
 else ifeq ($(CONFIG_MACH_MT6781),y)
 obj-y += mediatek/
+else ifeq ($(CONFIG_MACH_MT6785),y)
+obj-y += mediatek/
 else ifeq ($(CONFIG_MACH_MT6877),y)
 obj-y += mediatek/
 else ifeq ($(CONFIG_MACH_MT6833),y)
+obj-y += mediatek/
+else ifeq ($(CONFIG_MACH_MT6853),y)
+obj-y += mediatek/
+else ifeq ($(CONFIG_MACH_MT6873),y)
+obj-y += mediatek/
+else ifeq ($(CONFIG_MACH_MT6885),y)
 obj-y += mediatek/
 else ifeq ($(CONFIG_MACH_MT6893),y)
 obj-y += mediatek/
@@ -124,3 +132,6 @@ obj-$(CONFIG_CHARGER_TPS65217)	+= tps65217_charger.o
 obj-$(CONFIG_AXP288_FUEL_GAUGE) += axp288_fuel_gauge.o
 obj-$(CONFIG_AXP288_CHARGER)	+= axp288_charger.o
 
+ifeq ($(CONFIG_CUSTOM_BATTERY_EXTERNAL_CHANNEL),y)
+	obj-y += k6885v1_64_alpha/
+endif

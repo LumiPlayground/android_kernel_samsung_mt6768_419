@@ -788,6 +788,16 @@ config LEDS_REGULATOR_VIBRATOR
 	  To compile this driver as a module, choose 'M' here: the module
 	  will be called regulator-vibrator.
 
+config LEDS_SM5714
+	bool "LED support for the SM5714"
+	depends on LEDS_CLASS && MFD_SM5714
+	help
+	  This option enables support for SM5714 led chip.
+	  Say yes here to enable this.
+
+	  This driver is invoked from SM5714 PMIC.
+	  This driver will be called sm5714-fled.
+
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
 

@@ -120,6 +120,8 @@
 #define RTC_PROT		0x0034
 #define RTC_CON			0x003c
 
+#define RTC_SPAR0_BATT_REMOVAL	BIT(15)
+
 #define RTC_MIN_YEAR		1968
 #define RTC_BASE_YEAR		1900
 #define RTC_NUM_YEARS		128
@@ -1232,6 +1234,46 @@ static const struct rtc_class_ops mtk_rtc_ops = {
 	.set_alarm  = mtk_rtc_set_alarm,
 };
 
+#ifdef CONFIG_SEC_PM
+static int poff_status;
+
+static void rtc_reset_check(struct platform_device *pdev)
+{
+	u32 spar0 = 0;
+	struct mt6397_rtc *rtc = platform_get_drvdata(pdev);
+
+	regmap_read(rtc->regmap, rtc->addr_base + RTC_SPAR0, &spar0);
+	if (!(spar0 & RTC_SPAR0_BATT_REMOVAL)) {
+		poff_status = 1;
+		pr_info("%s: BATTERY REMOVED\n", __func__);
+
+		mutex_lock(&rtc->lock);
+		regmap_update_bits(rtc->regmap, rtc->addr_base + RTC_SPAR0,
+					RTC_SPAR0_BATT_REMOVAL, RTC_SPAR0_BATT_REMOVAL);
+		mtk_rtc_write_trigger(rtc);
+		mutex_unlock(&rtc->lock);
+	}
+}
+
+static ssize_t rtc_status_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	int status = poff_status;
+
+	pr_info("%s: complete power off status(%d)\n", __func__, status);
+	poff_status = 0;
+	return sprintf(buf, "%d\n", status);
+}
+
+static struct kobj_attribute rtc_status_attr = {
+	.attr = {
+		.name = __stringify(rtc_status),
+		.mode = 0444,
+	},
+	.show = rtc_status_show,
+};
+#endif /* CONFIG_SEC_PM  */
+
 static int mtk_rtc_reload(struct mt6397_rtc *rtc)
 {
 	int ret;
@@ -1652,6 +1694,14 @@ static int mtk_rtc_probe(struct platform_device *pdev)
 		rtc_pm_notifier_registered = true;
 #endif /* CONFIG_PM */
 
+#ifdef CONFIG_SEC_PM
+	rtc_reset_check(pdev);
+	if (power_kobj) {
+		ret = sysfs_create_file(power_kobj, &rtc_status_attr.attr);
+		if (ret)
+			pr_err("%s: failed %d\n", __func__, ret);
+	}
+#endif /* CONFIG_SEC_PM */
 	INIT_WORK(&rtc->work, mtk_rtc_work_queue);
 	/* KPOC alarm related setting */
 

@@ -29,6 +29,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
 
+#include <linux/soc/mediatek/mtk-pm-qos.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -59,7 +60,7 @@
 #include "ccu_qos.h"
 #include "ccu_ipc.h"
 //for mmdvfs
-#include <linux/pm_qos.h>
+#include <linux/soc/mediatek/mtk-pm-qos.h>
 #ifdef CONFIG_MTK_QOS_SUPPORT_ENABLE
 #include <mmdvfs_pmqos.h>
 #endif
@@ -87,7 +88,7 @@ static struct ion_handle
 	*import_buffer_handle[CCU_IMPORT_BUF_NUM];
 
 #ifdef CONFIG_PM_SLEEP
-struct wakeup_source ccu_wake_lock;
+struct wakeup_source *ccu_wake_lock;
 #endif
 /*static int g_bWaitLock;*/
 
@@ -832,15 +833,6 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd,
 		break;
 	}
 
-	case CCU_READ_REGISTER:
-	{
-		int regToRead = (int)arg;
-		int rc = ccu_read_info_reg(regToRead);
-
-		mutex_unlock(&g_ccu_device->dev_mutex);
-		return rc;
-	}
-
 	case CCU_READ_STRUCT_SIZE:
 	{
 		uint32_t structCnt;
@@ -1401,7 +1393,7 @@ if ((strcmp("ccu", g_ccu_device->dev->of_node->name) == 0)) {
 			goto EXIT;
 		}
 #ifdef CONFIG_PM_SLEEP
-	wakeup_source_init(&ccu_wake_lock, "ccu_lock_wakelock");
+					__pm_stay_awake(ccu_wake_lock);
 #endif
 
 		/* enqueue/dequeue control in ihalpipe wrapper */

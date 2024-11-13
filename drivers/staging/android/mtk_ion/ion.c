@@ -45,6 +45,8 @@
 #include "mtk/mtk_ion.h"
 #include "mtk/ion_drv_priv.h"
 
+#include <trace/systrace_mark.h>
+
 #ifdef CONFIG_MTK_IOMMU_V2
 #include <mach/pseudo_m4u.h>
 #endif
@@ -643,9 +645,9 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 	return 0;
 }
 
-struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
-			     size_t align, unsigned int heap_id_mask,
-			     unsigned int flags)
+struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
+			       size_t align, unsigned int heap_id_mask,
+			       unsigned int flags, bool grab_handle)
 {
 	struct ion_handle *handle;
 	struct ion_device *dev = client->dev;
@@ -655,6 +657,9 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	unsigned long long start, end;
 	unsigned int heap_mask = ~0;
 	unsigned int alloc_err_heap = 0;
+#ifdef CONFIG_ION_RBIN_HEAP
+	bool rbin_try = false;
+#endif
 
 	pr_debug("%s: len %zu align %zu heap_id_mask %u flags %x\n", __func__,
 		 len, align, heap_id_mask, flags);
@@ -664,6 +669,13 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	 */
 	if (heap_id_mask == heap_mask)
 		heap_id_mask = ION_HEAP_MULTIMEDIA_MASK;
+
+#ifdef CONFIG_ION_RBIN_HEAP
+	if (heap_id_mask == ION_HEAP_CAMERA_MASK) {
+		rbin_try = true;
+		heap_id_mask = ION_HEAP_RBIN_MASK;
+	}
+#endif
 
 	len = PAGE_ALIGN(len);
 
@@ -690,16 +702,30 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	 * succeeded or all heaps have been tried
 	 */
 	down_read(&dev->lock);
+#ifdef CONFIG_ION_RBIN_HEAP
+repeat:
+#endif
 	plist_for_each_entry(heap, &dev->heaps, node) {
 		/* if the caller didn't specify this heap id */
 		if (!((1 << heap->id) & heap_id_mask))
 			continue;
+		systrace_mark_begin("%s(%s, %zu, 0x%x, 0x%x)\n",
+			__func__, heap->name, len, heap_id_mask, flags);
 		buffer = ion_buffer_create(heap, dev, len, align, flags);
+		systrace_mark_end();
 		if (!IS_ERR(buffer))
 			break;
 		if (IS_ERR(buffer))
 			alloc_err_heap |= (1 << heap->id);
 	}
+
+#ifdef CONFIG_ION_RBIN_HEAP
+	if (rbin_try && (!buffer || IS_ERR(buffer))) {
+		rbin_try = false;
+		heap_id_mask = ION_HEAP_CAMERA_MASK;
+		goto repeat;
+	}
+#endif
 	up_read(&dev->lock);
 
 	if (!buffer) {
@@ -739,14 +765,19 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	mutex_lock(&client->lock);
 	ret = ion_handle_add(client, handle);
 	ion_client_buf_add(heap, client, len);
+	if (!ret && grab_handle)
+		ion_handle_get(handle);
 	mutex_unlock(&client->lock);
+	end = sched_clock();
 	if (ret) {
 		ion_handle_put(handle);
 		handle = ERR_PTR(ret);
 		IONMSG("%s ion handle add failed %d.\n", __func__, ret);
+	} else {
+		handle->dbg.user_ts = end;
+		do_div(handle->dbg.user_ts, 1000000);
+		memcpy(buffer->alloc_dbg, client->dbg_name, ION_MM_DBG_NAME_LEN);
 	}
-
-	end = sched_clock();
 
 	if (end - start > 100000000ULL) {/* unit is ns */
 		IONMSG("warn: ion alloc buffer size: %zu time: %lld ns\n",
@@ -762,11 +793,15 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 #endif
 #endif
 
-	handle->dbg.user_ts = end;
-	do_div(handle->dbg.user_ts, 1000000);
-	memcpy(buffer->alloc_dbg, client->dbg_name, ION_MM_DBG_NAME_LEN);
 
 	return handle;
+}
+
+struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
+			     size_t align, unsigned int heap_id_mask,
+			     unsigned int flags)
+{
+	return __ion_alloc(client, len, align, heap_id_mask, flags, false);
 }
 EXPORT_SYMBOL(ion_alloc);
 
@@ -1280,7 +1315,8 @@ static int ion_iommu_heap_type(struct ion_buffer *buffer)
 
 	if (buffer->heap->type == (int)ION_HEAP_TYPE_FB ||
 	    buffer->heap->type == (int)ION_HEAP_TYPE_MULTIMEDIA ||
-	    buffer->heap->type == (int)ION_HEAP_TYPE_MULTIMEDIA_SEC) {
+	    buffer->heap->type == (int)ION_HEAP_TYPE_MULTIMEDIA_SEC ||
+	    buffer->heap->type == (int)ION_HEAP_TYPE_RBIN) {
 		return 1;
 	}
 	return 0;
@@ -2819,33 +2855,21 @@ struct ion_buffer *ion_drv_file_to_buffer(struct file *file)
 {
 	struct dma_buf *dmabuf;
 	struct ion_buffer *buffer = NULL;
-	const char *pathname = NULL;
 
-	if (!file)
-		goto file2buf_exit;
-	if (!(file->f_path.dentry))
-		goto file2buf_exit;
+	if (!file || !is_dma_buf_file(file))
+		return ERR_PTR(-EINVAL);
 
-	pathname = file->f_path.dentry->d_name.name;
-	if (!pathname)
-		goto file2buf_exit;
-
-	if (strstr(pathname, "dmabuf")) {
-		dmabuf = file->private_data;
-		if (!dmabuf) {
-			IONMSG("%s warnning, dmabuf is NULL\n", __func__);
-			goto file2buf_exit;
-		}
-		if (dmabuf->ops == &dma_buf_ops)
-			buffer = dmabuf->priv;
+	dmabuf = file->private_data;
+	if (!dmabuf) {
+		IONMSG("%s warnning, dmabuf is NULL\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+	if (dmabuf->ops == &dma_buf_ops) {
+		buffer = dmabuf->priv;
+		return buffer;
 	}
 
-file2buf_exit:
-
-	if (buffer)
-		return buffer;
-	else
-		return ERR_PTR(-EINVAL);
+	return ERR_PTR(-EINVAL);
 }
 
 /* ===================================== */

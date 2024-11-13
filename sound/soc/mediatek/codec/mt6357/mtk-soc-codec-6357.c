@@ -60,6 +60,9 @@
 #if IS_ENABLED(CONFIG_MTK_PMIC_WRAP)
 #include <linux/soc/mediatek/pmic_wrap.h>
 #endif
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+#include "../../../codecs/mt6357-accdet.h"
+#endif
 #include <linux/nvmem-consumer.h>
 
 #include "mtk-soc-speaker-amp.h"
@@ -5912,10 +5915,15 @@ static void mt6357_codec_init_reg(struct snd_soc_component *component)
 	Ana_Set_Reg(AUDDEC_ANA_CON3, 0x1 << 4, 0x1 << 4);
 	/* disable LO buffer left short circuit protection */
 	Ana_Set_Reg(AUDDEC_ANA_CON4, 0x1 << 4, 0x1 << 4);
+	/* AUDENC_ANA_CON10 bit12 EINTHIRENB 0:2M 1:500k */
+	Ana_Set_Reg(AUDENC_ANA_CON10, 0x1c07, 0xffff);
 	/* set gpio */
 	set_playback_gpio(false);
 	set_capture_gpio(false);
 	audckbufEnable(false);
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+	mtk_accdet_init(component);
+#endif
 }
 void InitCodecDefault(void)
 {

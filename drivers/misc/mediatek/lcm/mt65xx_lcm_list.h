@@ -9,6 +9,9 @@
 
 #include <lcm_drv.h>
 
+#if defined(CONFIG_SMCDSD_PANEL)
+extern struct LCM_DRIVER smcdsd_panel_drv;
+#endif
 extern struct LCM_DRIVER otm1282a_hd720_dsi_vdo_60hz_lcm_drv;
 extern struct LCM_DRIVER otm1282a_hd720_dsi_vdo_lcm_drv;
 extern struct LCM_DRIVER nt35595_fhd_dsi_cmd_truly_8163_lcm_drv;
@@ -294,6 +297,7 @@ extern struct LCM_DRIVER ili9881c_hdp_dsi_vdo_ilitek_rt5081_lcm_drv;
 extern struct LCM_DRIVER nt51021_wuxga_dsi_vdo_mt8173_lcm_drv;
 extern struct LCM_DRIVER ili9881c_hdp_dsi_vdo_ilitek_rt5081_lcm_drv_ebbg;
 extern struct LCM_DRIVER hx8394f_hd720_dsi_vdo_tianma_lcm_drv;
+extern struct LCM_DRIVER jd9365_hd720_dsi_lcm_drv;
 extern struct LCM_DRIVER nt36672_fhdp_dsi_vdo_auo_lcm_drv;
 extern struct LCM_DRIVER nt36672_fhdp_dsi_vdo_auo_laneswap_lcm_drv;
 extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_60hz_wo_dsc_shenchao_lcm_drv;
@@ -329,6 +333,15 @@ extern struct LCM_DRIVER td4320_fhdp_dsi_vdo_auo_rt5081_lcm_drv;
 /*6768 otm */
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt5081_lcm_drv;
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt5081_hdp_lcm_drv;
+extern struct LCM_DRIVER hx83102p_wxga_vdo_incell_boe_lcm_drv;
+extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv;
+
+extern struct LCM_DRIVER td4150_hdp_dsi_lm36274_lcm_drv;
+extern struct LCM_DRIVER td4150_hdp_dsi_lm36274_lcm_a12_drv;
+extern struct LCM_DRIVER ili9882n_hdp_dsi_vdo_ilitek_lm36274_lcm_drv;
+extern struct LCM_DRIVER s6e3fc3_fhdp_cmd_lcm_drv;
+extern struct LCM_DRIVER s6e3fc3_fhdp_cmd_a22_lte_lcm_drv;
+extern struct LCM_DRIVER s6e3fc3_hdp_cmd_a22_lte_lcm_drv;
 
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);

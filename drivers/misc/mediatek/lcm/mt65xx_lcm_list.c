@@ -21,6 +21,12 @@ enum LCM_DSI_MODE_CON lcm_dsi_mode;
 #define LCD_HW_ID_STATUS_ERROR  0x03
 
 struct LCM_DRIVER *lcm_driver_list[] = {
+#if defined(HX83102P_WXGA_VDO_INCELL_BOE)
+	&hx83102p_wxga_vdo_incell_boe_lcm_drv,
+#endif
+#if defined(CONFIG_SMCDSD_PANEL)
+	&smcdsd_panel_drv,
+#endif
 #if defined(NT36672AH_HDP_DSI_VDO_TCL_CSOT)
 	&nt36672ah_hdp_dsi_vdo_tcl_csot_lcm_drv,
 #endif
@@ -1145,7 +1151,9 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 #if defined(HX8394F_HD720_DSI_VDO_TIANMA)
 	&hx8394f_hd720_dsi_vdo_tianma_lcm_drv,
 #endif
-
+#if defined(JD9365_HD720_DSI)
+	&jd9365_hd720_dsi_lcm_drv,
+#endif
 #if defined(NT36672_FHDP_DSI_VDO_AUO)
 	&nt36672_fhdp_dsi_vdo_auo_lcm_drv,
 #endif
@@ -1246,6 +1254,34 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 #if defined(OTM1911A_FHDP_DSI_VDO_TRULY_RT5081_HDP)
 	&otm1911a_fhdp_dsi_vdo_truly_rt5081_hdp_lcm_drv,
 #endif
+
+#if defined(OTM1911A_FHDP_DSI_VDO_TRULY_RT4801)
+	&otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv,
+#endif
+
+#if defined(TD4150_HDP_DSI_LM36274)
+	&td4150_hdp_dsi_lm36274_lcm_drv,
+#endif
+
+#if defined(TD4150_HDP_DSI_LM36274_A12)
+	&td4150_hdp_dsi_lm36274_lcm_a12_drv,
+#endif
+
+#if defined(ILI9882N_HDP_DSI_VDO_ILITEK_LM36274)
+	&ili9882n_hdp_dsi_vdo_ilitek_lm36274_lcm_drv,
+#endif
+
+#if defined(S6E3FC3_FHDP_CMD)
+	&s6e3fc3_fhdp_cmd_lcm_drv,
+#endif
+
+#if defined(S6E3FC3_FHDP_CMD_A22_LTE)
+	&s6e3fc3_fhdp_cmd_a22_lte_lcm_drv,
+#endif
+
+#if defined(S6E3FC3_HDP_CMD_A22_LTE)
+	&s6e3fc3_hdp_cmd_a22_lte_lcm_drv,
+#endif
 };
 
 unsigned char lcm_name_list[][128] = {
@@ -1310,6 +1346,9 @@ unsigned char lcm_name_list[][128] = {
 
 #if defined(NT35695B_FHD_DSI_VDO_AUO_RT5081_HDP)
 	"nt35695B_fhd_dsi_vdo_auo_rt5081_hdp_drv",
+#endif
+#if defined(HX83112B_FHDP_DSI_CMD_FHD_AUO_RT4801)
+	"hx83112b_fhdp_dsi_cmd_fhd_auo_rt4801_drv",
 #endif
 
 #if defined(NT35695B_FHD_DSI_CMD_TRULY_RT5081_720P)

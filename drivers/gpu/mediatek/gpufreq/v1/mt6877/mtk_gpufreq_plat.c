@@ -1882,6 +1882,15 @@ unsigned int mt_gpufreq_get_cur_volt(void)
 }
 EXPORT_SYMBOL(mt_gpufreq_get_cur_volt);
 
+/*
+ * API : get current GPU temperature
+ */
+int mt_gpufreq_get_gpu_temp(void)
+{
+	return get_immediate_gpu_wrap();
+}
+EXPORT_SYMBOL(mt_gpufreq_get_gpu_temp);
+
 /* API : get Thermal/Power/PBM limited OPP table index */
 int mt_gpufreq_get_cur_ceiling_idx(void)
 {
@@ -2115,6 +2124,9 @@ static unsigned int __mt_gpufreq_get_segment_id(void)
 		break;
 	case 0x02:
 		segment_id = MT6877T_SEGMENT;    /* 5G-5+ */
+		break;
+	case 0x03:
+		segment_id = MT6877T_SEGMENT;    /* 5G-5++ */
 		break;
 	default:
 		segment_id = MT6877_SEGMENT;
@@ -2934,10 +2946,6 @@ static enum g_posdiv_power_enum __mt_gpufreq_get_curr_posdiv_power(void)
 	mfgpll = DRV_Reg32(MFGPLL1_CON1);
 
 	posdiv_power = (mfgpll & (0x7 << POSDIV_SHIFT)) >> POSDIV_SHIFT;
-
-	gpufreq_pr_logbuf(
-		"%s : mfgpll: 0x%08x, posdiv_power: %d\n",
-		__func__, mfgpll, posdiv_power);
 
 	return posdiv_power;
 }

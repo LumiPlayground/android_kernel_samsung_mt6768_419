@@ -13,6 +13,16 @@
 #include <custome_external_battery.h>
 #endif
 
+signed int __attribute__((weak)) battery_get_precise_soc(void)
+{
+	return 0;
+}
+
+signed int __attribute__((weak)) battery_get_precise_uisoc(void)
+{
+	return 0;
+}
+
 int __attribute__((weak)) charger_get_vbus(void)
 {
 	return 4500;
@@ -41,11 +51,9 @@ signed int battery_get_soc(void)
 
 signed int battery_get_uisoc(void)
 {
-#if defined (CONFIG_MTK_BOOT)
-	int boot_mode = get_boot_mode();
-#else
-	int boot_mode = 0;
-#endif
+	struct mtk_battery *gm = get_mtk_battery();
+	int boot_mode = gm->boot_mode;
+
 	if ((boot_mode == META_BOOT) ||
 		(boot_mode == ADVMETA_BOOT) ||
 		(boot_mode == FACTORY_BOOT) ||
@@ -103,27 +111,26 @@ signed int battery_get_bat_current_mA(void)
 
 signed int battery_get_soc(void)
 {
-	if (get_mtk_battery() != NULL)
-		return get_mtk_battery()->soc;
+	struct mtk_battery *gm = get_mtk_battery();
+
+	if (gm != NULL)
+		return gm->soc;
 	else
 		return 50;
 }
 
 signed int battery_get_uisoc(void)
 {
-#if defined (CONFIG_MTK_BOOT)
-	int boot_mode = get_boot_mode();
-#else
-	int boot_mode = 0;
-#endif
+	struct mtk_battery *gm = get_mtk_battery();
+	int boot_mode = gm->boot_mode;
 
 	if ((boot_mode == META_BOOT) ||
 		(boot_mode == ADVMETA_BOOT) ||
 		(boot_mode == FACTORY_BOOT) ||
 		(boot_mode == ATE_FACTORY_BOOT))
 		return 75;
-	if (get_mtk_battery() != NULL)
-		return get_mtk_battery()->ui_soc;
+	if (gm != NULL)
+		return gm->ui_soc;
 	else
 		return 50;
 }

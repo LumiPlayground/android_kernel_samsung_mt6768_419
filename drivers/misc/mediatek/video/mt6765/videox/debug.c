@@ -1167,7 +1167,6 @@ static void process_dbg_opt(const char *opt)
 		set_esd_check_mode(mode);
 	} else if (strncmp(opt, "lcm0_reset", 10) == 0) {
 		DISPCHECK("lcm0_reset\n");
-#ifdef CONFIG_MTK_LEGACY
 		if (primary_display_is_video_mode()) {
 			if (pgc && (pgc->state == DISP_ALIVE)) {
 				DISP_CPU_REG_SET(
@@ -1180,9 +1179,7 @@ static void process_dbg_opt(const char *opt)
 					DISP_REG_CONFIG_MMSYS_LCM_RST_B, 1);
 			} else
 				DISPCHECK("lcm0_reset: DISP isn't alive\n");
-		} else
-#else
-		{
+		} else {
 			ret = disp_dts_gpio_select_state(
 				DTS_GPIO_STATE_LCM_RST_OUT1);
 			msleep(20);
@@ -1192,7 +1189,6 @@ static void process_dbg_opt(const char *opt)
 			ret |= disp_dts_gpio_select_state(
 				DTS_GPIO_STATE_LCM_RST_OUT1);
 		}
-#endif
 	} else if (strncmp(opt, "lcm0_reset0", 11) == 0) {
 		DISP_CPU_REG_SET(DISP_REG_CONFIG_MMSYS_LCM_RST_B, 0);
 	} else if (strncmp(opt, "lcm0_reset1", 11) == 0) {
@@ -1654,6 +1650,31 @@ static ssize_t debug_read(struct file *file,
 out:
 	return simple_read_from_buffer(ubuf, count, ppos, debug_buffer, n);
 }
+
+#if defined(CONFIG_SMCDSD_PANEL)
+int mtkfb_debug_show(struct seq_file *m, void *unused)
+{
+	int debug_bufmax;
+	static int n;
+
+	if (!is_buffer_init)
+		goto out;
+
+	DISPFUNC();
+
+	debug_bufmax = DEBUG_BUFFER_SIZE - 1;
+	n = debug_get_info(debug_buffer, debug_bufmax);
+	/* debug_info_dump_to_printk(); */
+out:
+	//return simple_read_from_buffer(ubuf, count, ppos, debug_buffer, n);
+	seq_puts(m, "------ DISPLAY DEBUG INFO (/proc/mtkfb) ------\n");
+	if (debug_buffer)
+		seq_puts(m, debug_buffer);
+
+	return 0;
+}
+EXPORT_SYMBOL(mtkfb_debug_show);
+#endif
 
 static ssize_t debug_write(struct file *file,
 	const char __user *ubuf, size_t count, loff_t *ppos)

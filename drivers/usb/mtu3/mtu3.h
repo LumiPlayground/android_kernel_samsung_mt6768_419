@@ -23,6 +23,10 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/role.h>
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#include "../../battery/common/sec_charging_common.h"
+#endif
+
 struct mtu3;
 struct mtu3_ep;
 struct mtu3_request;
@@ -324,6 +328,8 @@ struct ssusb_mtk {
 	bool clk_on;
 	bool clk_mgr;
 	bool spm_mgr;
+	/* u2 cdp */
+	struct work_struct dp_work;
 };
 
 /**
@@ -424,6 +430,12 @@ struct mtu3 {
 
 	unsigned is_gadget_ready:1;
 	int ep_slot_mode;
+	unsigned usb_bootcomplete:1;
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	struct work_struct set_vbus_current_work;
+	int	vbus_current; /* 100mA,  500mA,  900mA */
+#endif
 };
 
 static inline struct mtu3 *gadget_to_mtu3(struct usb_gadget *g)
@@ -483,6 +495,7 @@ int ssusb_check_clocks(struct ssusb_mtk *ssusb, u32 ex_clks);
 void ssusb_set_force_vbus(struct ssusb_mtk *ssusb, bool vbus_on);
 int ssusb_phy_power_on(struct ssusb_mtk *ssusb);
 void ssusb_phy_power_off(struct ssusb_mtk *ssusb);
+void ssusb_phy_dp_pullup(struct ssusb_mtk *ssusb);
 int ssusb_clks_enable(struct ssusb_mtk *ssusb);
 void ssusb_clks_disable(struct ssusb_mtk *ssusb);
 void ssusb_ip_sw_reset(struct ssusb_mtk *ssusb);

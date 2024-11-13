@@ -2426,7 +2426,7 @@ static int scp_device_probe(struct platform_device *pdev)
 	pr_debug("[SCP] mbox probe\n");
 	for (i = 0; i < scp_mboxdev.count; i++) {
 		scp_mbox_info[i].mbdev = &scp_mboxdev;
-		ret = mtk_mbox_probe(pdev, scp_mbox_info[i].mbdev, i);
+		ret = mtk_mbox_scp_probe(pdev, scp_mbox_info[i].mbdev, i);
 		if (ret < 0 || scp_mboxdev.info_table[i].irq_num < 0) {
 			pr_notice("[SCP] mbox%d probe fail\n", i, ret);
 			continue;

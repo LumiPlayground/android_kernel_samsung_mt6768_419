@@ -33,7 +33,7 @@
 #include "mt6853-interconnection.h"
 
 #if defined(CONFIG_SND_SOC_MTK_AUDIO_DSP)
-#include "../audio_dsp/mtk-dsp-common.h"
+#include "../audio_dsp/v2/mtk-dsp-common.h"
 #include <adsp_core.h>
 #endif
 #if defined(CONFIG_SND_SOC_MTK_SCP_SMARTPA)
@@ -139,6 +139,7 @@ int mt6853_fe_trigger(struct snd_pcm_substream *substream, int cmd,
 	unsigned int rate = runtime->rate;
 	int fs;
 	int ret = 0;
+	bool adsp_running = false;
 
 	dev_info(afe->dev, "%s(), %s cmd %d, irq_id %d\n",
 		 __func__, memif->data->name, cmd, irq_id);
@@ -226,8 +227,8 @@ int mt6853_fe_trigger(struct snd_pcm_substream *substream, int cmd,
 
 		/* set memif disable */
 #if defined(CONFIG_SND_SOC_MTK_AUDIO_DSP)
-		if (runtime->stop_threshold != ~(0U) || (!is_adsp_system_running()) ||
-		    mtk_audio_get_adsp_reset_status())
+		adsp_running = is_adsp_system_running();
+		if (runtime->stop_threshold != ~(0U) || !adsp_running)
 			ret = mtk_dsp_memif_set_disable(afe, id);
 #else
 		/* barge-in set stop_threshold == ~(0U), memif is set by scp */
@@ -241,8 +242,7 @@ int mt6853_fe_trigger(struct snd_pcm_substream *substream, int cmd,
 
 		/* disable interrupt */
 #if defined(CONFIG_SND_SOC_MTK_AUDIO_DSP)
-		if (runtime->stop_threshold != ~(0U) || (!is_adsp_system_running()) ||
-			mtk_audio_get_adsp_reset_status())
+		if (runtime->stop_threshold != ~(0U) || !adsp_running)
 			mtk_dsp_irq_set_disable(afe, irq_data);
 #else
 		/* barge-in set stop_threshold == ~(0U), interrupt is set by scp */
@@ -269,7 +269,9 @@ static int mt6853_memif_fs(struct snd_pcm_substream *substream,
 			   unsigned int rate)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct snd_soc_component *component =
+		snd_soc_rtdcom_lookup(rtd, AFE_PCM_NAME);
+	struct mtk_base_afe *afe = snd_soc_component_get_drvdata(component);
 	int id = rtd->cpu_dai->id;
 
 	return mt6853_rate_transform(afe->dev, rate, id);
@@ -284,7 +286,9 @@ static int mt6853_get_dai_fs(struct mtk_base_afe *afe,
 static int mt6853_irq_fs(struct snd_pcm_substream *substream, unsigned int rate)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct snd_soc_component *component =
+		snd_soc_rtdcom_lookup(rtd, AFE_PCM_NAME);
+	struct mtk_base_afe *afe = snd_soc_component_get_drvdata(component);
 
 	return mt6853_general_rate_transform(afe->dev, rate);
 }
@@ -1092,11 +1096,13 @@ static int mt6853_adsp_mem_get(struct snd_kcontrol *kcontrol,
 	case AUDIO_TASK_CALL_FINAL_ID:
 	case AUDIO_TASK_KTV_ID:
 	case AUDIO_TASK_VOIP_ID:
+	case AUDIO_TASK_ECHO_REF_DL_ID:
 		memif_num = get_dsp_task_attr(task_id,
 					      ADSP_TASK_ATTR_MEMDL);
 		break;
 	case AUDIO_TASK_CAPTURE_UL1_ID:
 	case AUDIO_TASK_FM_ADSP_ID:
+	case AUDIO_TASK_ECHO_REF_ID:
 		memif_num = get_dsp_task_attr(task_id,
 					      ADSP_TASK_ATTR_MEMUL);
 		break;
@@ -1132,11 +1138,13 @@ static int mt6853_adsp_mem_set(struct snd_kcontrol *kcontrol,
 	case AUDIO_TASK_FAST_ID:
 	case AUDIO_TASK_OFFLOAD_ID:
 	case AUDIO_TASK_VOIP_ID:
+	case AUDIO_TASK_ECHO_REF_DL_ID:
 		dl_memif_num = get_dsp_task_attr(task_id,
 						 ADSP_TASK_ATTR_MEMDL);
 		break;
 	case AUDIO_TASK_CAPTURE_UL1_ID:
 	case AUDIO_TASK_FM_ADSP_ID:
+	case AUDIO_TASK_ECHO_REF_ID:
 		ul_memif_num = get_dsp_task_attr(task_id,
 						 ADSP_TASK_ATTR_MEMUL);
 		break;
@@ -1381,6 +1389,14 @@ static const struct snd_kcontrol_new mt6853_pcm_kcontrols[] = {
 		       mt6853_adsp_ref_mem_get,
 		       mt6853_adsp_ref_mem_set),
 	SOC_SINGLE_EXT("adsp_fast_sharemem_scenario",
+		       SND_SOC_NOPM, 0, 0x1, 0,
+		       mt6853_adsp_mem_get,
+		       mt6853_adsp_mem_set),
+	SOC_SINGLE_EXT("adsp_echoref_sharemem_scenario",
+		       SND_SOC_NOPM, 0, 0x1, 0,
+		       mt6853_adsp_mem_get,
+		       mt6853_adsp_mem_set),
+	SOC_SINGLE_EXT("adsp_echodl_sharemem_scenario",
 		       SND_SOC_NOPM, 0, 0x1, 0,
 		       mt6853_adsp_mem_get,
 		       mt6853_adsp_mem_set),
@@ -3429,7 +3445,9 @@ static int mt6853_afe_pcm_copy(struct snd_pcm_substream *substream,
 			       mtk_sp_copy_f sp_copy)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct snd_soc_component *component =
+		snd_soc_rtdcom_lookup(rtd, AFE_PCM_NAME);
+	struct mtk_base_afe *afe = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
 	mt6853_set_audio_int_bus_parent(afe, CLK_TOP_MAINPLL_D4_D4);
@@ -3545,14 +3563,15 @@ static const struct mtk_audio_sram_ops mt6853_sram_ops = {
 	.set_sram_mode = mt6853_set_sram_mode,
 };
 
-static int mt6853_afe_pcm_platform_probe(struct snd_soc_platform *platform)
+static int mt6853_afe_pcm_platform_probe(struct snd_soc_component *platform)
 {
 	mtk_afe_add_sub_dai_control(platform);
 	mt6853_add_misc_control(platform);
 	return 0;
 }
 
-const struct snd_soc_platform_driver mt6853_afe_pcm_platform = {
+const struct snd_soc_component_driver mt6853_afe_component = {
+	.name = AFE_PCM_NAME,
 	.ops = &mtk_afe_pcm_ops,
 	.pcm_new = mtk_afe_pcm_new,
 	.pcm_free = mtk_afe_pcm_free,
@@ -6176,11 +6195,11 @@ static int mt6853_afe_pcm_dev_probe(struct platform_device *pdev)
 					   afe, &mt6853_debugfs_ops);
 
 	/* register platform */
-	ret = devm_snd_soc_register_platform(&pdev->dev,
-					     &mt6853_afe_pcm_platform);
+	ret = devm_snd_soc_register_component(&pdev->dev,
+					     &mt6853_afe_component, NULL, 0);
 	if (ret) {
 		dev_warn(dev, "err_platform\n");
-		goto err_platform;
+		goto err_dai_component;
 	}
 
 	ret = devm_snd_soc_register_component(&pdev->dev,
@@ -6205,9 +6224,6 @@ static int mt6853_afe_pcm_dev_probe(struct platform_device *pdev)
 
 err_dai_component:
 	snd_soc_unregister_component(&pdev->dev);
-
-err_platform:
-	snd_soc_unregister_platform(&pdev->dev);
 
 err_pm_disable:
 	pm_runtime_disable(&pdev->dev);

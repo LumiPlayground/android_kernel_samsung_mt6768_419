@@ -1249,7 +1249,8 @@ static void clk_core_disable_unprepare(struct clk_core *core)
 
 #if (!defined(CONFIG_MACH_MT6779) \
 	&& !defined(CONFIG_MACH_MT6739) \
-	&& !defined(CONFIG_MACH_MT6768))
+	&& !defined(CONFIG_MACH_MT6768) \
+	&& !defined(CONFIG_MACH_MT6785))
 static void clk_unprepare_unused_subtree(struct clk_core *core)
 {
 	struct clk_core *child;
@@ -1376,8 +1377,8 @@ static int clk_disable_unused(void)
 
 #if (!defined(CONFIG_MACH_MT6779) \
 	&& !defined(CONFIG_MACH_MT6739) \
-	&& !defined(CONFIG_MACH_MT6768))
-
+	&& !defined(CONFIG_MACH_MT6768) \
+	&& !defined(CONFIG_MACH_MT6785))
 	struct clk_core *core;
 #endif
 
@@ -1389,7 +1390,8 @@ static int clk_disable_unused(void)
 
 #if (!defined(CONFIG_MACH_MT6779) \
 	&& !defined(CONFIG_MACH_MT6739) \
-	&& !defined(CONFIG_MACH_MT6768))
+	&& !defined(CONFIG_MACH_MT6768) \
+	&& !defined(CONFIG_MACH_MT6785))
 	clk_prepare_lock();
 
 	hlist_for_each_entry(core, &clk_root_list, child_node)
@@ -3189,6 +3191,57 @@ void clk_debug_print_hw(struct clk_core *clk, struct seq_file *f)
 {
 }
 EXPORT_SYMBOL(clk_debug_print_hw);
+
+#ifdef CONFIG_SEC_PM
+static struct hlist_head *debug_all_lists[] = {
+    &clk_root_list,
+    &clk_orphan_list,
+    NULL,
+};
+
+static int sec_clock_debug_print_clock(struct clk_core *c, int level)
+{
+    int count = 0;
+    struct clk_core *child;
+
+    if (!c || !c->enable_count)
+        return count;
+
+    pr_info("%*s%-*s %11d %12d %11lu %10lu %-3d\n",
+           level * 3 + 1, "",
+           30 - level * 3, c->name,
+           c->enable_count, c->prepare_count, clk_core_get_rate(c),
+           clk_core_get_accuracy(c), clk_core_get_phase(c));
+    count++;
+
+    hlist_for_each_entry(child, &c->children, child_node)
+        count += sec_clock_debug_print_clock(child, level + 1);
+
+    return count;
+}
+
+void sec_clock_debug_print_enabled(void)
+{
+    int count = 0;
+    struct clk_core *c;
+    struct hlist_head **lists = (struct hlist_head **)debug_all_lists;
+
+    pr_info("Enabled clocks:\n");
+    pr_info("   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase\n");
+    pr_info("----------------------------------------------------------------------------------------\n");
+
+    clk_prepare_lock();
+
+    for (; *lists; lists++)
+        hlist_for_each_entry(c, *lists, child_node)
+            count += sec_clock_debug_print_clock(c, 0);
+
+    clk_prepare_unlock();
+
+    pr_info("Enabled clock count: %d\n", count);
+}
+EXPORT_SYMBOL(sec_clock_debug_print_enabled);
+#endif /* CONFIG_SEC_PM  */
 
 /***        debugfs support        ***/
 

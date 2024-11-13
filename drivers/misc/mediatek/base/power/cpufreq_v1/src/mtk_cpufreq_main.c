@@ -19,6 +19,10 @@
 
 #define DCM_ENABLE 1
 
+#ifdef CONFIG_CPU_FREQ_LIMIT
+#include <linux/cpufreq_limit.h>
+#endif /* CONFIG_CPU_FREQ_LIMIT  */
+
 #define met_tag_oneshot(a, b, c) do {} while (0)
 //#define _set_met_tag_oneshot(a, bz) do{}while(0)
 
@@ -1758,6 +1762,9 @@ static int __init _mt_cpufreq_tbl_init(void)
 			p->opp_tbl = opp_tbl_info->opp_tbl;
 			p->nr_opp_tbl = opp_tbl_info->size;
 			p->freq_tbl_for_cpufreq = table;
+#ifdef CONFIG_CPU_FREQ_LIMIT
+			cpufreq_limit_set_table(p->cpu_id, table);
+#endif /* CONFIG_CPU_FREQ_LIMIT  */
 		}
 	}
 	return 0;

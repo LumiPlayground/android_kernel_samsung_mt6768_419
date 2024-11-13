@@ -49,7 +49,7 @@
 #define VOW_MODEL_SIZE_THRES           0x2800
 #define VOW_MODEL_SIZE                 0x11000
 #define VOW_VOICEDATA_OFFSET           (VOW_MODEL_SIZE * MAX_VOW_SPEAKER_MODEL)
-#define VOW_VOICEDATA_SIZE             0x12500 /* 74880, need over 2.3sec */
+#define VOW_VOICEDATA_SIZE             0xA280 // 41600, need over 1.3
 /* IPI return value definition */
 #define WORD_H                         16
 #define WORD_L                         0
@@ -121,6 +121,7 @@
 #define VOW_SET_PAYLOADDUMP_INFO      _IOW(VOW_IOC_MAGIC, 0x16, unsigned int)
 #define VOW_READ_VOICE_DATA           _IOW(VOW_IOC_MAGIC, 0x17, unsigned int)
 #define VOW_READ_VOW_DUMP_DATA        _IOW(VOW_IOC_MAGIC, 0x18, unsigned int)
+#define VOW_SET_WAKEUP_MODE           _IOW(VOW_IOC_MAGIC, 0x1E, unsigned int)
 
 #ifdef VOW_ECHO_SW_SRC
 #define VOW_BARGEIN_AFE_MEMIF_SIZE    0x1E00
@@ -130,7 +131,7 @@
 #define VOW_BARGEIN_IRQ_MAX_NUM       32
 
 #define KERNEL_VOW_DRV_VER              "2.1.0"
-#define DEFAULT_GOOGLE_ENGINE_VER       2147483647
+#define DEFAULT_GOOGLE_ENGINE_VER       1235201314  /* set meaningless default value */
 
 struct dump_package_t {
 	uint32_t dump_data_type;
@@ -198,7 +199,11 @@ enum vow_ipi_msgid_t {
 	IPIMSG_VOW_ALEXA_ENGINE_VER = 25,
 	IPIMSG_VOW_GOOGLE_ENGINE_VER = 26,
 	IPIMSG_VOW_GOOGLE_ARCH = 27,
-	IPIMSG_VOW_SET_CUSTOM_MODEL = 28
+	IPIMSG_VOW_SET_CUSTOM_MODEL = 28,
+	IPIMSG_VOW_HAL_REBOOT = 29,
+	IPIMSG_VOW_FLUSH = 30,
+	IPIMSG_VOW_SET_BIXBY_ENGINE_VER = 40,
+	IPIMSG_VOW_SET_BIXBY_ENGINE_MODE = 41
 };
 
 enum vow_eint_status_t {

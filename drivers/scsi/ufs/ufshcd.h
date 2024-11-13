@@ -84,6 +84,9 @@
 
 struct ufs_hba;
 
+/* unique number */
+#define UFS_UN_20_DIGITS 20
+
 enum dev_cmd_type {
 	DEV_CMD_TYPE_NOP		= 0x0,
 	DEV_CMD_TYPE_QUERY		= 0x1,
@@ -132,6 +135,19 @@ struct uic_command {
 	u32 argument3;
 	struct completion done;
 };
+
+enum ufs_tw_state {
+	UFS_TW_OFF_STATE = 0,		/* turbo write disabled state */
+	UFS_TW_ON_STATE	= 1,		/* turbo write enabled state */
+	UFS_TW_ERR_STATE = 2,		/* turbo write error state */
+};
+
+#define ufshcd_is_tw_off(hba) ((hba)->ufs_tw_state == UFS_TW_OFF_STATE)
+#define ufshcd_is_tw_on(hba) ((hba)->ufs_tw_state == UFS_TW_ON_STATE)
+#define ufshcd_is_tw_err(hba) ((hba)->ufs_tw_state == UFS_TW_ERR_STATE)
+#define ufshcd_set_tw_off(hba) ((hba)->ufs_tw_state = UFS_TW_OFF_STATE)
+#define ufshcd_set_tw_on(hba) ((hba)->ufs_tw_state = UFS_TW_ON_STATE)
+#define ufshcd_set_tw_err(hba) ((hba)->ufs_tw_state = UFS_TW_ERR_STATE)
 
 /* Used to differentiate the power management options */
 enum ufs_pm_op {
@@ -287,6 +303,7 @@ struct ufs_desc_size {
 	int unit_desc;
 	int conf_desc;
 	int hlth_desc;
+	int str_desc;
 };
 
 /**
@@ -559,6 +576,24 @@ enum {
 	UFSHCD_STATE_EH_SCHEDULED,
 };
 
+struct SEC_UFS_TW_info {
+	u64 tw_state_ts;
+	u64 tw_enable_ms;
+	u64 tw_disable_ms;
+	u64 tw_amount_W_kb;
+	u64 tw_enable_count;
+	u64 tw_disable_count;
+	u64 tw_setflag_error_count;
+	u64 hibern8_amount_ms;
+	u64 hibern8_enter_count;
+	u64 hibern8_amount_ms_100ms;
+	u64 hibern8_enter_count_100ms;
+	u64 hibern8_max_ms;
+	ktime_t hibern8_enter_ts;
+	struct timespec timestamp;
+	bool tw_info_disable;
+};
+
 /**
  * struct ufs_hba - per adapter private structure
  * @mmio_base: UFSHCI base register address
@@ -642,6 +677,7 @@ struct ufs_hba {
 
 	enum ufs_dev_pwr_mode curr_dev_pwr_mode;
 	enum uic_link_state uic_link_state;
+	enum ufs_tw_state ufs_tw_state;
 	/* Desired UFS power management level during runtime PM */
 	enum ufs_pm_level rpm_lvl;
 	/* Desired UFS power management level during system PM */
@@ -848,8 +884,23 @@ struct ufs_hba {
 	struct ufs_desc_size desc_size;
 	atomic_t scsi_block_reqs_cnt;
 
+	char unique_number[UFS_UN_20_DIGITS + 1];
+	u8 lifetime;
+	bool support_tw;
+	bool tw_state_not_allowed;
+	u8 wb_dedicated_lu;
+	u8 b_tw_buffer_type;
+	struct mutex tw_ctrl_mutex;
+	struct SEC_UFS_TW_info SEC_tw_info;
+	struct SEC_UFS_TW_info SEC_tw_info_old;
+	unsigned int lc_info;
+
 	struct device		bsg_dev;
 	struct request_queue	*bsg_queue;
+
+	bool rpm_dev_flush_capable;
+	struct delayed_work rpm_dev_flush_recheck_work;
+
 #if defined(CONFIG_SCSI_UFS_FEATURE)
 	struct ufsf_feature ufsf;
 #endif
@@ -1101,6 +1152,7 @@ int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
 		      enum attr_idn idn, u8 index, u8 selector, u32 *attr_val);
 int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	enum flag_idn idn, bool *flag_res);
+int ufshcd_read_health_desc(struct ufs_hba *hba, u8 *buf, u32 size);
 
 void ufshcd_auto_hibern8_enable(struct ufs_hba *hba);
 void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit);
@@ -1295,6 +1347,11 @@ static inline void ufshcd_vops_dbg_register_dump(struct ufs_hba *hba)
 {
 	if (hba->vops && hba->vops->dbg_register_dump)
 		hba->vops->dbg_register_dump(hba);
+#if defined(CONFIG_SCSI_UFS_TEST_MODE)
+	/* do not recover system if test mode is enabled */
+	BUG();
+#endif
+
 }
 
 static inline void ufshcd_vops_device_reset(struct ufs_hba *hba)
